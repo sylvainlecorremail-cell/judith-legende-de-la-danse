@@ -42,13 +42,16 @@ function npc(n){
  g.fillStyle='#0005';g.beginPath();g.ellipse(n.x,n.y-3,n.w*.30,5,0,0,Math.PI*2);g.fill();
  if(n.k==='noemi'){
    const moving=n.walkPhase>0&&dist(n.x,n.y,n.targetX,n.targetY)>5&&!dialog&&!battle;
-   const idx=moving?(n.facing==='right'?7:n.facing==='left'?6:4+Math.floor(n.walkPhase)%2):0;
+   // Animation directionnelle : privilégier les poses validées de Noémi.
+   // Les tailles affichées restent STRICTEMENT celles de la version approuvée.
+   const frame=Math.floor(n.walkPhase*1.6)%4;
+   const idx=moving?({down:[0,4,0,5],up:[2,2,2,2],left:[1,6,1,6],right:[3,7,3,7]}[n.facing]||[0,4,0,5])[frame]:({down:0,up:2,left:1,right:3}[n.facing]??0);
    const im=noemiFrames[idx];
    if(im&&im.complete&&im.naturalWidth){g.imageSmoothingEnabled=false;g.drawImage(im,n.x-n.w/2,n.y-n.h,n.w,n.h)}
    if(!starDelivered)label('✦',n.x,n.y-n.h-23,18,'#ffd681');
  }else{
    const walk=approvedWalk[n.k];
-   const active=n.walkPhase>0&&!dialog&&!battle;
+   const active=n.walkPhase>0&&dist(n.x,n.y,n.targetX,n.targetY)>5&&!dialog&&!battle;
    if(active&&walk&&walk.complete&&walk.naturalWidth){
      const column=Math.floor(n.walkPhase*1.6)%4;
      const row={down:0,up:1,left:2,right:3}[n.facing]||0;
