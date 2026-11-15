@@ -43,17 +43,18 @@ function drawNPCWalk(n,walk,row,col){
  const spec=WALK_CROPS[n.k];
  const crop=spec.frames[row][col];
  const ref=spec.static;
- // Exact same visible footprint as the approved stationary art.
- const targetW=n.w*ref[2],targetH=n.h*ref[3];
- const ratio=Math.min(targetW/crop[2],targetH/crop[3]);
- const dw=crop[2]*ratio,dh=crop[3]*ratio;
+ // Lock visible height to the approved idle silhouette: never scale by width.
+ // A side-facing pose may naturally be narrower, but cannot shrink the head.
+ const targetH=n.h*ref[3];
+ const scale=targetH/crop[3];
+ const dw=crop[2]*scale,dh=targetH;
  const centerX=n.x+n.w*(ref[0]+ref[2]/2-.5);
  const bottomY=n.y-n.h*(1-ref[1]-ref[3]);
  g.drawImage(walk,crop[0],crop[1],crop[2],crop[3],centerX-dw/2,bottomY-dh,dw,dh);
 }
 function npc(n){
  g.fillStyle='#0005';g.beginPath();g.ellipse(n.x,n.y-3,n.w*.30,5,0,0,Math.PI*2);g.fill();
- const walk=approvedWalk[n.k];
+ const walk=n.k==='isabelle'?null:approvedWalk[n.k];
  const moving=n.walkPhase>0&&dist(n.x,n.y,n.targetX,n.targetY)>5&&!dialog&&!battle;
  if(moving&&walk&&walk.complete&&walk.naturalWidth){
   const col=Math.floor(n.walkPhase*1.6)%4;
