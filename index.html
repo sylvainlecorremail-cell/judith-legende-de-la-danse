@@ -41,7 +41,8 @@ const approvedWalk={};for(const k of Object.keys(APPROVED_WALK)){const im=new Im
 const WALK_CROPS={"marceau":{"frames":[[[40,51,46,97],[148,57,45,94],[250,46,49,102],[357,31,59,123]],[[29,198,54,108],[137,214,55,100],[248,185,60,124],[357,213,58,101]],[[39,369,48,96],[137,362,57,109],[249,371,53,102],[347,328,80,139]],[[41,520,49,105],[144,523,48,102],[251,511,53,113],[364,496,59,128]]],"static":[0.015873015873015872,0.006666666666666667,0.9682539682539683,0.9866666666666667]},"nadege":{"frames":[[[42,43,40,103],[150,51,40,96],[258,53,38,96],[365,55,39,95]],[[41,209,40,101],[140,208,50,98],[258,211,37,94],[360,212,47,94]],[[42,364,38,112],[143,369,48,107],[256,368,36,108],[354,364,52,112]],[[41,523,41,105],[149,524,39,99],[258,530,39,99],[365,525,39,98]]],"static":[0.0,0.0,1.0,1.0]},"isabelle":{"frames":[[[23,8,67,148],[133,8,70,148],[246,8,68,148],[357,8,68,148]],[[22,167,68,148],[129,167,76,148],[245,168,69,148],[352,167,80,148]],[[21,327,69,148],[127,327,81,148],[244,327,70,148],[350,327,83,148]],[[21,488,70,148],[132,488,70,148],[244,488,71,148],[357,488,70,148]]],"static":[0.0,0.0,1.0,1.0]},"noemi":{"frames":[[[21,7,69,149],[135,7,66,149],[245,7,69,149],[355,7,74,149]],[[17,167,78,149],[125,167,85,149],[241,167,78,149],[349,167,85,149]],[[16,327,79,149],[123,327,89,149],[240,327,79,149],[347,327,89,149]],[[25,487,61,149],[137,487,61,149],[249,487,61,149],[361,487,61,149]]],"static":[0.03571428571428571,0.0109375,0.9375,0.9828125]}};
 function drawNPCWalk(n,walk,row,col){
  const spec=WALK_CROPS[n.k];
- const crop=spec.frames[row][col];
+ // Nadège's right-facing art is inconsistent: mirror the approved left-facing frames.
+ const crop=spec.frames[n.k==='nadege'&&row===2?1:row][col];
  const ref=spec.static;
  // Lock visible height to the approved idle silhouette: never scale by width.
  // A side-facing pose may naturally be narrower, but cannot shrink the head.
@@ -50,7 +51,7 @@ function drawNPCWalk(n,walk,row,col){
  const dw=crop[2]*scale,dh=targetH;
  const centerX=n.x+n.w*(ref[0]+ref[2]/2-.5);
  const bottomY=n.y-n.h*(1-ref[1]-ref[3]);
- g.drawImage(walk,crop[0],crop[1],crop[2],crop[3],centerX-dw/2,bottomY-dh,dw,dh);
+ if(n.k==='nadege'&&row===2){g.save();g.translate(2*centerX,0);g.scale(-1,1);g.drawImage(walk,crop[0],crop[1],crop[2],crop[3],centerX-dw/2,bottomY-dh,dw,dh);g.restore()}else g.drawImage(walk,crop[0],crop[1],crop[2],crop[3],centerX-dw/2,bottomY-dh,dw,dh);
 }
 function npc(n){
  g.fillStyle='#0005';g.beginPath();g.ellipse(n.x,n.y-3,n.w*.30,5,0,0,Math.PI*2);g.fill();
