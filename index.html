@@ -121,13 +121,19 @@ function houseWalk(x,y){
  if(x<55||x>905||y<345||y>608)return false;
  // Leave a clear approach to the boundary at every door, without walking on furnishings.
  for(const portal of HOUSE_PORTALS[scene]||[]){if(Math.hypot(x-portal.x,y-portal.y)<36)return true;}
- if(scene==='salon' && y>=535 && x>=620)return true;
+ // Continuous walkable strip in front of the living-room furniture.
+ if(scene==='salon' && y>=545)return true;
  return !(HOUSE_BLOCKERS[scene]||[]).some(poly=>pointInPolygon(x,y,poly));
 }
 function edgeExit(){
  if(!HOUSE_SCENES.includes(scene))return false;
  for(const p of HOUSE_PORTALS[scene]||[]){
-  const close=p.side==='bottom'?Math.abs(px-p.x)<53&&py>=594:Math.abs(py-p.y)<52&&Math.abs(px-p.x)<13;
+  // Door transitions must match the direction of travel: walking horizontally
+  // past Marceau's door must never teleport Judith into his bedroom.
+  const close=p.side==='bottom'
+    ? dir==='down' && Math.abs(px-p.x)<38 && py>=594
+    : (p.side==='left'?dir==='left':dir==='right') &&
+      Math.abs(py-p.y)<52 && Math.abs(px-p.x)<13;
   if(close){houseGo(p.to,p.spawn);return true;}
  }
  return false;
