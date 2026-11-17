@@ -102,7 +102,7 @@ const HOUSE_PORTALS={
  jardin:[{to:'cuisine',x:58,y:545,side:'left',spawn:[130,545]},
          {to:'cour',x:902,y:545,side:'right',spawn:[840,545]}],
  cour:[{to:'jardin',x:58,y:545,side:'left',spawn:[835,545]},
-       {to:'quartier',x:902,y:545,side:'right',spawn:[165,700]}]
+       {to:'route',x:902,y:545,side:'right',spawn:[480,545]}]
 };
 const HOUSE_SPAWN={chambre_judith:[180,510],salon:[470,555],bureau:[780,540],chambre_marceau:[165,530],cuisine:[820,560],jardin:[480,545],cour:[500,545]};
 // Collision zones use the character's foot position, not its bounding box.
@@ -138,7 +138,7 @@ function edgeExit(){
  }
  return false;
 }
-function houseGo(to,spawn){scene=to;if(to==='quartier'){px=165;py=700;visitedQuartier=true;}else{[px,py]=spawn||HOUSE_SPAWN[to]||[480,540];}dir='down';phase=0;dialog='';updateHouseNav();}
+function houseGo(to,spawn){if(to==='route'){startRoad();return;}scene=to;if(to==='quartier'){px=165;py=700;visitedQuartier=true;}else{[px,py]=spawn||HOUSE_SPAWN[to]||[480,540];}dir='down';phase=0;dialog='';updateHouseNav();}
 function houseInteract(){
  if(scene==='jardin'){
   const maman=npcs.jardin[0];
@@ -174,6 +174,78 @@ if(!localStorage.getItem('judith_ch11')){scene='chambre_judith';px=180;py=510;di
 else{try{let v=JSON.parse(localStorage.getItem('judith_ch11'));if(v&&HOUSE_SCENES.includes(v.scene)){scene=v.scene;px=v.px;py=v.py;}}catch(e){}}
 updateHouseNav();
 
+
+// Mini-jeu : traversée de Saint-Thuriau, ~48 s sans collision.
+const ROAD_DURATION=48;
+let roadElapsed=0,roadX=480,roadCars=[],roadSpawn=0,roadCrash=0,roadAttempts=0;
+const ROAD_LANES=[250,405,560,715];
+function startRoad(){scene='route';roadElapsed=0;roadX=480;roadCars=[];roadSpawn=.5;roadCrash=0;roadAttempts++;dialog='';keys.clear();updateHouseNav();}
+function roadTick(dt){
+ if(roadCrash>0){roadCrash-=dt;return;}
+ const sideways=(+keys.has('right')-+keys.has('left'));
+ roadX=Math.max(183,Math.min(777,roadX+sideways*365*dt));
+ if(sideways){dir=sideways>0?'right':'left';phase+=dt*3;}else{dir='down';phase+=dt*1.3;}
+ roadElapsed+=dt;roadSpawn-=dt;
+ if(roadSpawn<=0){
+  // One or two obstacles at a time; never block all four lanes.
+  const step=Math.floor(roadElapsed/1.15);
+  const lane=(step*7+Math.floor(step/3)*3)%4;
+  roadCars.push({x:ROAD_LANES[lane],y:-110,speed:260+(step%4)*20,color:['#c33e4c','#e7bd55','#6b9ed3','#77a98e'][step%4]});
+  if(step%4===2)roadCars.push({x:ROAD_LANES[(lane+2)%4],y:-215,speed:275,color:'#b7b6c4'});
+  roadSpawn+=1.15;
+ }
+ for(const car of roadCars){
+  car.y+=car.speed*dt;
+  if(Math.abs(roadX-car.x)<67 && Math.abs(514-car.y)<91){
+   roadElapsed=0;roadX=480;roadCars=[];roadSpawn=.9;roadCrash=1.05;roadAttempts++;keys.clear();return;
+  }
+ }
+ roadCars=roadCars.filter(car=>car.y<750);
+ if(roadElapsed>=ROAD_DURATION){
+  scene='quartier';px=165;py=700;dir='right';visitedQuartier=true;
+  dialog='Bravo ! Judith a traversé la route sans se faire toucher. Bienvenue sur la place de l’église !';
+  keys.clear();updateHouseNav();
+ }
+}
+function renderRoad(){
+ g.clearRect(0,0,960,640);
+ g.fillStyle='#79a263';g.fillRect(0,0,960,640);
+ // Talus, trottoirs, chaussée et bandes de circulation en pixel art.
+ for(let i=0;i<28;i++){let x=(i*83+17)%960,y=(i*119+Math.floor(roadElapsed*100))%640;
+  g.fillStyle=i%3?'#54854c':'#b8bb74';g.fillRect(x,y,12+(i%4)*7,7);}
+ g.fillStyle='#a3a5a2';g.fillRect(116,0,42,640);g.fillRect(802,0,42,640);
+ g.fillStyle='#414850';g.fillRect(158,0,644,640);
+ g.fillStyle='#62686e';g.fillRect(165,0,6,640);g.fillRect(789,0,6,640);
+ for(let y=-100+(roadElapsed*245)%115;y<640;y+=115){
+  for(const x of [327,482,637]){g.fillStyle='#f8e6b3';g.fillRect(x-4,y,8,61);}
+ }
+ for(const car of roadCars){
+  g.save();g.translate(car.x,car.y);
+  g.fillStyle='#171d24aa';g.fillRect(-55,-73,116,165);
+  g.fillStyle='#1b2634';g.fillRect(-62,-52,14,39);g.fillRect(48,-52,14,39);g.fillRect(-62,38,14,39);g.fillRect(48,38,14,39);
+  g.fillStyle=car.color;g.fillRect(-49,-81,98,162);
+  g.fillStyle='#283d52';g.fillRect(-39,-43,78,53);g.fillRect(-37,32,74,28);
+  g.fillStyle='#a7d2e0';g.fillRect(-32,-37,64,14);
+  g.fillStyle='#fce8a0';g.fillRect(-43,72,25,9);g.fillRect(18,72,25,9);
+  g.fillStyle='#9b242d';g.fillRect(-43,-76,25,8);g.fillRect(18,-76,25,8);
+  g.restore();
+ }
+ // Judith uses her original animated sprite and an invariant, fixed scale.
+ judith(roadX,514,1.18);label('Judith',roadX,380,19);
+ g.fillStyle='#0f1b2ddd';g.fillRect(155,13,650,82);
+ label('LA ROUTE DE SAINT-THURIAU',480,41,25,'#fff1c8');
+ label('Évite les voitures • Gauche / Droite',480,70,17,'#ffffff');
+ g.fillStyle='#142238';g.fillRect(180,108,600,17);
+ g.fillStyle='#72db9a';g.fillRect(182,110,596*Math.min(1,roadElapsed/ROAD_DURATION),13);
+ label('Arrivée dans '+Math.ceil(Math.max(0,ROAD_DURATION-roadElapsed))+' s',480,152,19,'#ffffff');
+ if(roadCrash>0){
+  g.fillStyle='#5b1025b8';g.fillRect(0,200,960,220);
+  label('TOUCHÉE !',480,273,40,'#fff1c8');
+  label('Retour au départ — essaie encore !',480,330,24,'#ffffff');
+ }
+}
+
+if(scene==='route')startRoad();
 function canWalk(x,y){if(HOUSE_SCENES.includes(scene))return houseWalk(x,y);if(scene==='pontivy')return (x>145&&x<1400&&y>=825&&y<985) || (x>745&&x<860&&y>=755&&y<825); if(scene==='quartier')return x>95&&x<1460&&y>360&&y<935&&!(x>790&&y<535)&&!(x<310&&y<480)&&!(x>1110&&y<635)&&!(x>810&&x<1150&&y>650&&y<820);if(scene==='studio')return x>95&&x<870&&y>270&&y<565&&!(x<185&&y<400)&&!(x>785&&y<420);if(scene==='library')return x>85&&x<875&&y>320&&y<568&&!(x<325&&y<435)&&!(x>650&&y<330)&&!(x<235&&y>510);if(x<185||x>1480||y<357||y>935)return false;if(y<420&&(x<390||x>1435))return false;if(y<422&&!(Math.abs(x-492)<92||Math.abs(x-1354)<95))return false;if(y>810&&(x<335||x>1160))return false;if(x<330&&y>620)return false;if(x>1170&&y>725)return false;return true}
 function enter(which){scene=which;px=480;py=540;dir='up';phase=0;dialog=''}
 function exitRoom(){const old=scene;scene='place';px=old==='studio'?492:1354;py=422;dir='down';phase=0;dialog=''}
@@ -195,9 +267,9 @@ if(Math.abs(px-1354)<48&&py>=367&&py<=405){enter('library');return}
 if(px>1350&&py>500&&py<725){scene='quartier';px=195;py=700;dir='right';visitedQuartier=true;dialog='Judith découvre le quartier de l’église ! Cherche le panneau et la fontaine.';return}
 const noemi=npcs.place[1];if(dist(px,py,noemi.x,noemi.y)<105){if(battleWon){if(roadStep===0){roadStep=1;dialog='Noémi : Tu as gagné la première étoile ! Le prochain défi est à Pontivy, auprès de Papi Bruno. Va demander à Isabelle ce qu’elle sait.'}else{dialog='Noémi : Tu es prête pour la suite ! Le prochain champion t’attend à Pontivy.'}}else if(starDelivered){startBattle()}else{dialog='Noémi : Je suis prête à danser contre toi ! Mais termine d’abord la quête des étoiles et parle à Isabelle.'}return}const n=npcs.place[0];if(dist(px,py,n.x,n.y)<105){if(starDelivered){friend=true;if(battleWon&&roadStep===3){roadStep=4;dialog='Marceau : Le sac est prêt ! Le départ pour Pontivy est indiqué par une étoile dorée à l’ouest de la place. Allons-y !'}else if(battleWon){dialog='Marceau : J’ai hâte de partir ! Termine les préparatifs auprès de Noémi, Isabelle et Nadège.'}else{dialog='Marceau : Tu as découvert le sceau ! Maintenant, va parler à Noémi, juste à côté de moi, pour lancer ton premier duel.'}}else if(quest){friend=true;dialog='Marceau : Bravo Judith ! Tu as appris la 4e jazz ! Allons voir Isabelle à la bibliothèque.'}else dialog='Marceau : Nadège t’attend à l’école de danse !';return}
 dialog='Place Judith juste devant la porte, puis appuie sur Entrer.'}
-function render(){if(HOUSE_SCENES.includes(scene)){renderHouse();return;}if(battle){renderBattle();return}g.clearRect(0,0,960,640);if(scene==='pontivy'){camx=0;camy=0;g.save();g.scale(0.625,0.625);if(pontivyImage.complete&&pontivyImage.naturalWidth)g.drawImage(pontivyImage,0,0,1536,1024);judith(px,py,1.12);label('Judith',px,py-126,18);if(py>880)label('▼ RETOUR : SAINT-THURIAU',800,985,20,'#fff0b0');g.restore()}else if(scene==='quartier'){camx=Math.max(0,Math.min(1536-960,px-480));camy=Math.max(0,Math.min(1024-640,py-380));g.save();g.translate(-Math.round(camx),-Math.round(camy));drawImg('quartier',0,0,1536,1024);for(const n of npcs.quartier)npc(n);judith(px,py,1.12);label('Judith',px,py-126,16);if(px<260&&py>520&&py<840)label('◀ RETOUR À LA PLACE',245,580,19,'#ffedb1');if(dist(px,py,875,595)<200)label('✦ PANNEAU',875,500,18,'#ffedb1');if(dist(px,py,1045,825)<205)label('✦ FONTAINE',1045,695,18,'#ffedb1');g.restore()}else if(scene==='place'){camx=Math.max(0,Math.min(1536-960,px-480));camy=Math.max(0,Math.min(1024-640,py-380));g.save();g.translate(-Math.round(camx),-Math.round(camy));drawImg('place',0,0,1536,1024);for(const n of npcs.place)npc(n);judith(px,py,1.12);label('Judith',px,py-126,16);if(battleWon&&roadStep>=4)label('✦ DÉPART POUR PONTIVY',310,465,19,'#ffe090');if(px>1300&&py>480&&py<730)label('➜ QUARTIER DE L’ÉGLISE',1340,470,18,'#ffedb1');if(Math.abs(px-492)<54&&py>=358&&py<=410)label('✦ ENTRER : ÉCOLE',492,280,18,'#ffedb1');if(Math.abs(px-1354)<54&&py>=358&&py<=410)label('✦ ENTRER : BIBLIOTHÈQUE',1354,280,18,'#ffedb1');g.restore()}else{drawImg(scene,0,0,960,640);for(const n of npcs[scene])npc(n);judith(px,py,1.28);label('Judith',px,py-142,16);if(py>465)label('▼ SORTIE',480,601,19,'#fff0b0')}
+function render(){if(scene==='route'){renderRoad();return;}if(HOUSE_SCENES.includes(scene)){renderHouse();return;}if(battle){renderBattle();return}g.clearRect(0,0,960,640);if(scene==='pontivy'){camx=0;camy=0;g.save();g.scale(0.625,0.625);if(pontivyImage.complete&&pontivyImage.naturalWidth)g.drawImage(pontivyImage,0,0,1536,1024);judith(px,py,1.12);label('Judith',px,py-126,18);if(py>880)label('▼ RETOUR : SAINT-THURIAU',800,985,20,'#fff0b0');g.restore()}else if(scene==='quartier'){camx=Math.max(0,Math.min(1536-960,px-480));camy=Math.max(0,Math.min(1024-640,py-380));g.save();g.translate(-Math.round(camx),-Math.round(camy));drawImg('quartier',0,0,1536,1024);for(const n of npcs.quartier)npc(n);judith(px,py,1.12);label('Judith',px,py-126,16);if(px<260&&py>520&&py<840)label('◀ RETOUR À LA PLACE',245,580,19,'#ffedb1');if(dist(px,py,875,595)<200)label('✦ PANNEAU',875,500,18,'#ffedb1');if(dist(px,py,1045,825)<205)label('✦ FONTAINE',1045,695,18,'#ffedb1');g.restore()}else if(scene==='place'){camx=Math.max(0,Math.min(1536-960,px-480));camy=Math.max(0,Math.min(1024-640,py-380));g.save();g.translate(-Math.round(camx),-Math.round(camy));drawImg('place',0,0,1536,1024);for(const n of npcs.place)npc(n);judith(px,py,1.12);label('Judith',px,py-126,16);if(battleWon&&roadStep>=4)label('✦ DÉPART POUR PONTIVY',310,465,19,'#ffe090');if(px>1300&&py>480&&py<730)label('➜ QUARTIER DE L’ÉGLISE',1340,470,18,'#ffedb1');if(Math.abs(px-492)<54&&py>=358&&py<=410)label('✦ ENTRER : ÉCOLE',492,280,18,'#ffedb1');if(Math.abs(px-1354)<54&&py>=358&&py<=410)label('✦ ENTRER : BIBLIOTHÈQUE',1354,280,18,'#ffedb1');g.restore()}else{drawImg(scene,0,0,960,640);for(const n of npcs[scene])npc(n);judith(px,py,1.28);label('Judith',px,py-142,16);if(py>465)label('▼ SORTIE',480,601,19,'#fff0b0')}
 rect(12,12,420,50,'#16263cdd');label(scene==='pontivy'?'Pontivy · Château des Rohan':scene==='place'?'Saint-Thuriau · Place du village':scene==='quartier'?'Saint-Thuriau · Quartier de l’église':scene==='studio'?'École de danse · Nadège':'Bibliothèque · Isabelle',25,43,19,'#ffe7b0','left');rect(12,70,390,52,'#16263cdd');label(scene==='pontivy'?'Quête : découvrir le château et le message de Papi Bruno':departureReady?'✓ Pontivy : départ préparé !':battleWon?(roadStep===0?'Après le duel : parler à Noémi':roadStep===1?'Pontivy : consulter Isabelle':roadStep===2?'Pontivy : parler à Nadège':roadStep===3?'Pontivy : retrouver Marceau':'Pontivy : rejoindre l’étoile à l’ouest'): starDelivered?'Quête : défier Noémi sur la place':foundNotice&&foundFountain?'Quête : rapporter le secret à Isabelle':starQuest?'Quête : examiner la fontaine':visitedQuartier?'Quartier : lire le panneau':book?'✓ Livre des quatre danses trouvé':friend?'✓ Marceau retrouvé':quest?'Quête : retrouver Marceau':'Quête : parler à Nadège',25,101,17,'#fff1d0','left');if(dialog){rect(65,471,830,137,'#17253bef');g.strokeStyle='#f0c883';g.lineWidth=4;g.strokeRect(65,471,830,137);g.textAlign='left';g.font='19px system-ui';g.fillStyle='#fff';let line='',y=508;for(const word of dialog.split(' ')){let test=line+word+' ';if(g.measureText(test).width>770){g.fillText(line,88,y);y+=27;line=word+' '}else line=test}g.fillText(line,88,y);g.font='14px system-ui';g.fillText('Appuie sur « Parler / Entrer » pour continuer',88,588)}}
-let last=performance.now();function loop(now){let dt=Math.min(.05,(now-last)/1000);last=now;let dx=+keys.has('right')-+keys.has('left'),dy=+keys.has('down')-+keys.has('up');if((dx||dy)&&!dialog&&!battle){let m=Math.hypot(dx,dy),sx=dx/m*170*dt,sy=dy/m*170*dt;dir=Math.abs(sx)>Math.abs(sy)?sx>0?'right':'left':sy>0?'down':'up';if(canWalk(px+sx,py))px+=sx;if(canWalk(px,py+sy))py+=sy;phase+=dt*2.4;steps+=dt;if(edgeExit()){keys.clear();}if(scene==='place'&&px>1430&&py>490&&py<710){scene='quartier';px=165;py=700;visitedQuartier=true;dialog='Bienvenue dans le quartier de l’église !'}else if(scene==='quartier'&&px<120&&py>530&&py<850){scene='place';px=1390;py=595;dialog=''}/* Les portes nécessitent désormais une action explicite. */}else phase=0;moveNPCs(dt,now);if(window._lastNavScene!==scene){window._lastNavScene=scene;updateHouseNav();}render();requestAnimationFrame(loop)}requestAnimationFrame(loop);
+let last=performance.now();function loop(now){let dt=Math.min(.05,(now-last)/1000);last=now;if(scene==='route'){roadTick(dt);render();requestAnimationFrame(loop);return;}let dx=+keys.has('right')-+keys.has('left'),dy=+keys.has('down')-+keys.has('up');if((dx||dy)&&!dialog&&!battle){let m=Math.hypot(dx,dy),sx=dx/m*170*dt,sy=dy/m*170*dt;dir=Math.abs(sx)>Math.abs(sy)?sx>0?'right':'left':sy>0?'down':'up';if(canWalk(px+sx,py))px+=sx;if(canWalk(px,py+sy))py+=sy;phase+=dt*2.4;steps+=dt;if(edgeExit()){keys.clear();}if(scene==='place'&&px>1430&&py>490&&py<710){scene='quartier';px=165;py=700;visitedQuartier=true;dialog='Bienvenue dans le quartier de l’église !'}else if(scene==='quartier'&&px<120&&py>530&&py<850){scene='place';px=1390;py=595;dialog=''}/* Les portes nécessitent désormais une action explicite. */}else phase=0;moveNPCs(dt,now);if(window._lastNavScene!==scene){window._lastNavScene=scene;updateHouseNav();}render();requestAnimationFrame(loop)}requestAnimationFrame(loop);
 function keyDir(k){return({ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',z:'up',Z:'up',q:'left',Q:'left',s:'down',S:'down',d:'right',D:'right',w:'up',a:'left'})[k]}
 addEventListener('keydown',e=>{let d=keyDir(e.key);if(d){keys.add(d);e.preventDefault()}if([' ','Enter','e','E'].includes(e.key)){if(battle&&!battleText&&!battleBusy)playerMove(0);else interact();e.preventDefault()}});addEventListener('keyup',e=>{let d=keyDir(e.key);if(d)keys.delete(d)});addEventListener('blur',()=>keys.clear());document.querySelectorAll('[data-dir]').forEach(b=>{let d=b.dataset.dir;b.addEventListener('pointerdown',e=>{b.setPointerCapture(e.pointerId);keys.add(d);e.preventDefault()});for(let ev of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(ev,()=>keys.delete(d))});document.getElementById('act').onclick=()=>{if(battle&&!battleText&&!battleBusy)playerMove(0);else interact()};document.getElementById('save').onclick=save;document.getElementById('restart').onclick=()=>{if(!window.confirm('Recommencer toute l’aventure ? La progression sauvegardée sur cet appareil sera effacée.'))return;for(const k of ['judith_ch11','judith_ch10','judith_ch9','judith_ch8','judith_ch7']){try{localStorage.removeItem(k)}catch(e){}}window.location.reload()};document.getElementById('journal').onclick=()=>{if(battle){battleText='Choisis une technique avec les boutons du duel. Alterne les mouvements pour garder le moral !';return}dialog=battleWon?(departureReady?'Journal : Les préparatifs sont terminés. Le voyage à Pontivy sera la prochaine étape.':roadStep===0?'Journal : Retourne parler à Noémi pour recevoir ta première étoile.':roadStep===1?'Journal : Va voir Isabelle dans la bibliothèque.':roadStep===2?'Journal : Va demander conseil à Nadège au studio.':roadStep===3?'Journal : Retrouve Marceau sur la place.':'Journal : Rejoins le repère doré à l’ouest de la place pour préparer le départ.'):starDelivered?'Journal : Le sceau des quatre danses est découvert. Va raconter la nouvelle à Marceau !':foundNotice&&foundFountain?'Journal : Les deux indices sont réunis. Retourne parler à Isabelle.':starQuest?'Journal : Le panneau parle du symbole caché sur la fontaine. Examine la fontaine !':'Journal : Lis le panneau du quartier de l’église, puis cherche la fontaine.'};
 
