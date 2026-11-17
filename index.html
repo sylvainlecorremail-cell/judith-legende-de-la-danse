@@ -9,7 +9,7 @@ let scene='place',px=760,py=690,dir='down',phase=0,dialog='',quest=false,friend=
 try{const v=JSON.parse(localStorage.getItem('judith_ch10')||localStorage.getItem('judith_ch9')||localStorage.getItem('judith_ch8')||localStorage.getItem('judith_ch7')||'null');if(v){scene=['place','studio','library','quartier','pontivy'].includes(v.scene)?v.scene:'place';px=+v.px||760;py=+v.py||690;quest=!!v.quest;friend=!!v.friend;book=!!v.book;visitedQuartier=!!v.visitedQuartier;foundNotice=!!v.foundNotice;foundFountain=!!v.foundFountain;starQuest=!!v.starQuest;starDelivered=!!v.starDelivered;battleWon=!!v.battleWon;roadStep=+v.roadStep||0;departureReady=!!v.departureReady}}catch(e){}
 function save(){try{localStorage.setItem('judith_ch11',JSON.stringify({scene,px,py}));localStorage.setItem('judith_ch10',JSON.stringify({scene,px,py,quest,friend,book,visitedQuartier,foundNotice,foundFountain,starQuest,starDelivered,battleWon,roadStep,departureReady}));dialog='Progression sauvegardée sur cet appareil.'}catch(e){dialog='Sauvegarde indisponible.'}}
 const keys=new Set();function dist(x,y,a,b){return Math.hypot(x-a,y-b)}
-const npcs={place:[{x:950,y:585,k:'marceau',name:'Marceau',w:47,h:91},{x:1110,y:590,k:'noemi',name:'Noémi',w:49,h:91}],studio:[{x:660,y:423,k:'nadege',name:'Nadège',w:75,h:143}],library:[{x:632,y:405,k:'isabelle',name:'Isabelle',w:71,h:134}],quartier:[{x:535,y:695,k:'maman',name:'Maman',w:75,h:143}]};
+const npcs={place:[{x:950,y:585,k:'marceau',name:'Marceau',w:47,h:91},{x:1110,y:590,k:'noemi',name:'Noémi',w:49,h:91}],studio:[{x:660,y:423,k:'nadege',name:'Nadège',w:75,h:143}],library:[{x:632,y:405,k:'isabelle',name:'Isabelle',w:71,h:134}],quartier:[],jardin:[{x:540,y:555,k:'maman',name:'Maman',w:75,h:143}]};
 function rect(x,y,w,h,color){g.fillStyle=color;g.fillRect(x,y,w,h)}
 function label(s,x,y,size=18,col='#fff',align='center'){g.textAlign=align;g.font=`bold ${size}px system-ui`;g.lineWidth=4;g.strokeStyle='#1b2534';g.strokeText(s,x,y);g.fillStyle=col;g.fillText(s,x,y)}
 function drawImg(k,x,y,w,h){let im=imgs[k];if(im.complete&&im.naturalWidth)g.drawImage(im,x,y,w,h)}
@@ -113,14 +113,31 @@ function houseWalk(x,y){
  }return true;
 }
 function houseGo(to){scene=to;if(to==='quartier'){px=165;py=700;visitedQuartier=true;}else{[px,py]=HOUSE_SPAWN[to]||[480,540];}dir='down';phase=0;dialog='';updateHouseNav();}
-function houseInteract(){const portals=HOUSE_PORTALS[scene]||[];let best=portals.slice().sort((a,b)=>dist(px,py,a.x,a.y)-dist(px,py,b.x,b.y))[0];if(best&&dist(px,py,best.x,best.y)<115){houseGo(best.to);return;}
+function houseInteract(){
+ if(scene==='jardin'){
+  const maman=npcs.jardin[0];
+  if(maman&&dist(px,py,maman.x,maman.y)<155){
+   dialog='Maman : Coucou Judith ! Tu es prête pour une nouvelle aventure ?';
+   return;
+  }
+ }
+ const portals=HOUSE_PORTALS[scene]||[];let best=portals.slice().sort((a,b)=>dist(px,py,a.x,a.y)-dist(px,py,b.x,b.y))[0];if(best&&dist(px,py,best.x,best.y)<115){houseGo(best.to);return;}
  dialog=scene==='chambre_judith'?'La chambre de Judith : ses livres, sa guitare et ses souvenirs.':scene==='chambre_marceau'?'La chambre de Marceau : ses voitures et sa grande grue.':scene==='bureau'?'Le bureau de Papa : les BD, le casque automobile et les ordinateurs.':scene==='salon'?'Le salon familial : un endroit idéal pour se retrouver.':scene==='cuisine'?'La cuisine : Judith pourrait préparer une petite surprise.':scene==='cour'?'Une Alpine A110 R bleue mate est garée devant le garage.':'Le jardin : Judith peut rejoindre la cour.';
 }
 function renderHouse(){g.clearRect(0,0,960,640);let im=houseImgs[scene];if(im&&im.complete&&im.naturalWidth)g.drawImage(im,0,0,960,640);
  // Hide the old illustrative HUD where possible with an opaque, consistent new label.
  rect(8,8,300,47,'#17263de8');label('⌂ '+HOUSE_TITLES[scene],20,40,21,'#ffe3a5','left');
  for(const portal of HOUSE_PORTALS[scene]||[]){g.fillStyle='#17263cbd';g.beginPath();g.roundRect(portal.x-69,portal.y-56,138,34,9);g.fill();label('↗ '+portal.title,portal.x,portal.y-33,13,'#fff2c4');g.strokeStyle='#f6d28a';g.lineWidth=2;g.beginPath();g.arc(portal.x,portal.y,13,0,Math.PI*2);g.stroke();}
- judith(px,py,1.10);label('Judith',px,py-127,16);
+ // Fixed scene-specific scale based on the approved illustrative Judith in each room.
+ // The garden already had the correct apparent scale and is deliberately unchanged.
+ const HOUSE_JUDITH_SCALE={
+  chambre_judith:1.62,salon:1.60,bureau:1.60,
+  chambre_marceau:1.62,cuisine:1.60,jardin:1.10,cour:1.53
+ };
+ const judithScale=HOUSE_JUDITH_SCALE[scene]||1.10;
+ if(scene==='jardin')for(const n of npcs.jardin)npc(n);
+ judith(px,py,judithScale);
+ label('Judith',px,py-110*judithScale-12,16);
  if(dialog){rect(45,470,870,140,'#17253bf2');g.strokeStyle='#f0c883';g.lineWidth=3;g.strokeRect(45,470,870,140);g.font='18px system-ui';g.fillStyle='white';g.textAlign='left';let words=dialog.split(' '),line='',yy=510;for(const w of words){if(g.measureText(line+' '+w).width>800){g.fillText(line,68,yy);line=w;yy+=27;}else line+=(line?' ':'')+w;}g.fillText(line,68,yy);label('Parler / Entrer pour continuer',480,587,14,'#ffe2a8');}
 }
 function updateHouseNav(){const bar=document.getElementById('houseNav');if(!bar)return;bar.innerHTML='';if(!HOUSE_SCENES.includes(scene))return;for(const p of HOUSE_PORTALS[scene]||[]){const b=document.createElement('button');b.textContent='🚪 '+p.title;b.className='houseExit';b.onclick=()=>houseGo(p.to);bar.appendChild(b);}}
@@ -136,7 +153,7 @@ function exitRoom(){const old=scene;scene='place';px=old==='studio'?492:1354;py=
 function interact(){if(HOUSE_SCENES.includes(scene)){if(dialog){dialog="";return;}houseInteract();return;}if(battle){if(battleText){battleText='';if(battleLost){battle=false;dialog='Noémi : Reviens quand tu seras prête ! Tu peux retenter le duel en parlant à Noémi.'}else if(battleWon){battle=false;dialog='Noémi : Bravo Judith ! Tu as gagné ton premier duel ! Reparle-moi : j’ai un secret à te confier.'};return}return}if(dialog){dialog='';return}if(scene==='pontivy'){if(py>930&&px>580&&px<1050){scene='place';px=310;py=560;dir='right';dialog='Retour à Saint-Thuriau.';return}if(px>720&&px<880&&py<815){dialog='Les grandes portes du château des Rohan sont devant Judith. Papi Bruno lui a laissé un message : « Entraîne-toi, nous danserons bientôt ! »';return}dialog='Judith découvre les remparts de granit, les tours et les abords du château des Rohan.';return}
  if(scene==='quartier'){
  if(px<260&&py>780){houseGo('cour');return;}
- const maman=npcs.quartier[0];if(dist(px,py,maman.x,maman.y)<150){dialog='Maman : Coucou Judith ! Je suis venue voir comment avance ton aventure. Continue à t’entraîner, je suis fière de toi !';return}
+ 
  if(px<220&&py>545&&py<805){scene='place';px=1380;py=595;dir='left';dialog='';return}
  if(dist(px,py,875,595)<170){foundNotice=true;starQuest=true;dialog='Panneau : « Le secret des étoiles : trouve le symbole de la fontaine puis demande à Isabelle de consulter le vieux livre. »';return}
  if(dist(px,py,1045,825)<195){foundFountain=true;dialog=starQuest?'Sur la fontaine, Judith déchiffre une étoile à huit branches. Isabelle saura peut-être ce qu’elle signifie !':'Une étoile à huit branches est gravée sur la fontaine. Le panneau près de l’église en parle peut-être !';return}
